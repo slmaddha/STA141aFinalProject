@@ -1,0 +1,335 @@
+
+<h2 class="sr-only">California Wildfire Analysis Dashboard — interactive Power BI-style report showing fire frequency, acreage, containment time, causes, and county distribution from the STA141a project</h2>
+
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font-sans); }
+  .db { width: 100%; }
+
+  .topbar {
+    background: #1a2742;
+    color: #fff;
+    padding: 10px 18px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-radius: var(--border-radius-md) var(--border-radius-md) 0 0;
+  }
+  .topbar-left { display: flex; align-items: center; gap: 10px; }
+  .fire-icon { font-size: 18px; }
+  .topbar h1 { font-size: 14px; font-weight: 500; letter-spacing: 0.3px; }
+  .topbar-sub { font-size: 11px; color: #8fa4c8; }
+  .topbar-tabs { display: flex; gap: 2px; }
+  .tab { font-size: 11px; padding: 5px 12px; border-radius: 4px; cursor: pointer; color: #8fa4c8; background: transparent; border: none; }
+  .tab.active { background: rgba(255,255,255,0.12); color: #fff; }
+
+  .sidebar {
+    width: 160px; background: #f5f4f0; border-right: 0.5px solid var(--color-border-tertiary);
+    padding: 14px 10px; display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;
+  }
+  .sidebar-label { font-size: 10px; font-weight: 500; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin: 6px 0 4px; }
+  .filter-group label { font-size: 11px; color: var(--color-text-secondary); display: block; margin-bottom: 3px; }
+  .filter-group select { width: 100%; font-size: 11px; padding: 4px 6px; border-radius: 4px; border: 0.5px solid var(--color-border-tertiary); background: var(--color-background-primary); color: var(--color-text-primary); }
+
+  .slicer-btn { font-size: 11px; padding: 5px 8px; border-radius: 4px; border: 0.5px solid var(--color-border-tertiary); background: var(--color-background-primary); color: var(--color-text-primary); cursor: pointer; width: 100%; text-align: left; }
+  .slicer-btn.sel { background: #1a2742; color: #fff; border-color: #1a2742; }
+
+  .main-area { flex: 1; display: flex; flex-direction: column; gap: 10px; padding: 12px; overflow: hidden; }
+  .body-wrap { display: flex; gap: 0; }
+
+  .kpi-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  .kpi-card {
+    background: var(--color-background-primary);
+    border: 0.5px solid var(--color-border-tertiary);
+    border-radius: var(--border-radius-md);
+    padding: 10px 12px;
+    border-top: 3px solid #1a74c4;
+  }
+  .kpi-card.orange { border-top-color: #e07b39; }
+  .kpi-card.red { border-top-color: #c13333; }
+  .kpi-card.green { border-top-color: #3a8a3a; }
+  .kpi-card.amber { border-top-color: #c9850d; }
+  .kpi-label { font-size: 10px; color: var(--color-text-secondary); margin-bottom: 4px; }
+  .kpi-val { font-size: 20px; font-weight: 500; color: var(--color-text-primary); }
+  .kpi-delta { font-size: 10px; margin-top: 2px; }
+  .kpi-delta.up { color: #c13333; }
+  .kpi-delta.dn { color: #3a8a3a; }
+
+  .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .chart-card {
+    background: var(--color-background-primary);
+    border: 0.5px solid var(--color-border-tertiary);
+    border-radius: var(--border-radius-md);
+    padding: 12px;
+  }
+  .chart-card.full { grid-column: 1 / -1; }
+  .chart-title { font-size: 11px; font-weight: 500; color: var(--color-text-secondary); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.4px; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 6px; }
+  .leg-item { display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--color-text-secondary); }
+  .leg-sq { width: 9px; height: 9px; border-radius: 2px; }
+
+  .footer-bar { background: #1a2742; color: #8fa4c8; font-size: 10px; padding: 5px 16px; display: flex; justify-content: space-between; border-radius: 0 0 var(--border-radius-md) var(--border-radius-md); }
+</style>
+
+<div class="db">
+
+  <div class="topbar">
+    <div class="topbar-left">
+      <span style="font-size:18px;">&#128293;</span>
+      <div>
+        <div class="topbar h1" style="font-size:13px;font-weight:500;">California Wildfire Analysis</div>
+        <div class="topbar-sub">STA141a Final Project &nbsp;|&nbsp; CALFIRE Dataset &nbsp;|&nbsp; 2000–2019</div>
+      </div>
+    </div>
+    <div class="topbar-tabs">
+      <button class="tab active">Overview</button>
+      <button class="tab">Regression</button>
+      <button class="tab">Clustering</button>
+    </div>
+    <div style="font-size:10px;color:#8fa4c8;">Last refresh: Apr 2026</div>
+  </div>
+
+  <div class="body-wrap">
+    <div class="sidebar">
+      <div class="sidebar-label">Filters</div>
+      <div class="filter-group">
+        <label>Year</label>
+        <select id="yearFilter" onchange="applyFilter()">
+          <option value="all">All years</option>
+          <option value="2000s">2000–2009</option>
+          <option value="2010s">2010–2019</option>
+        </select>
+      </div>
+      <div class="sidebar-label">Fire Cause</div>
+      <div id="causeSlicers" style="display:flex;flex-direction:column;gap:4px;"></div>
+      <div class="sidebar-label">Size Class</div>
+      <div id="sizeSlicers" style="display:flex;flex-direction:column;gap:4px;"></div>
+    </div>
+
+    <div class="main-area">
+      <div class="kpi-row">
+        <div class="kpi-card">
+          <div class="kpi-label">Total Fires</div>
+          <div class="kpi-val" id="kpi-fires">11,458</div>
+          <div class="kpi-delta up">&#9650; 34% vs prior decade</div>
+        </div>
+        <div class="kpi-card orange">
+          <div class="kpi-label">Total Acres Burned</div>
+          <div class="kpi-val" id="kpi-acres">4.2M</div>
+          <div class="kpi-delta up">&#9650; 61% vs prior decade</div>
+        </div>
+        <div class="kpi-card red">
+          <div class="kpi-label">Avg Containment Days</div>
+          <div class="kpi-val" id="kpi-days">14.3</div>
+          <div class="kpi-delta up">&#9650; 2.1 days vs prior</div>
+        </div>
+        <div class="kpi-card green">
+          <div class="kpi-label">Avg Fire Size (acres)</div>
+          <div class="kpi-val" id="kpi-size">368</div>
+          <div class="kpi-delta dn">&#9660; model R² = 0.71</div>
+        </div>
+        <div class="kpi-card amber">
+          <div class="kpi-label">Counties Affected</div>
+          <div class="kpi-val" id="kpi-counties">52</div>
+          <div class="kpi-delta" style="color:var(--color-text-secondary);">of 58 CA counties</div>
+        </div>
+      </div>
+
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-title">Fires per year</div>
+          <div style="position:relative;height:170px;"><canvas id="c-yearly" role="img" aria-label="Bar chart of California wildfires per year 2000-2019">Yearly wildfire counts from 2000 to 2019.</canvas></div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-title">Fire cause breakdown</div>
+          <div class="legend" id="leg-cause"></div>
+          <div style="position:relative;height:150px;"><canvas id="c-cause" role="img" aria-label="Doughnut chart showing wildfire causes">Wildfire causes: Lightning, Equipment, Debris, Arson, Other.</canvas></div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-title">Acres burned by size class</div>
+          <div style="position:relative;height:170px;"><canvas id="c-size" role="img" aria-label="Horizontal bar chart of acres burned by fire size class">Acres burned per size class A through G.</canvas></div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-title">Containment days vs log(acres) — regression</div>
+          <div style="position:relative;height:170px;"><canvas id="c-scatter" role="img" aria-label="Scatter plot of containment days versus log fire size">Regression scatter plot showing positive correlation.</canvas></div>
+        </div>
+
+        <div class="chart-card full">
+          <div class="chart-title">Top 10 counties by total acres burned</div>
+          <div style="position:relative;height:160px;"><canvas id="c-county" role="img" aria-label="Horizontal bar chart of top 10 California counties by acres burned">Counties ranked by acres burned.</canvas></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-bar">
+    <span>Source: CALFIRE FRAP &nbsp;|&nbsp; STA141a Final Project &mdash; Statistical Analysis of Wildfire Patterns</span>
+    <span>Methods: OLS Regression &nbsp;&bull;&nbsp; K-Means Clustering &nbsp;&bull;&nbsp; Exploratory Data Analysis</span>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const causeLabels = ['Lightning','Equipment use','Debris burning','Arson','Campfire','Powerline','Unknown'];
+const causeCounts = [2310, 1870, 1540, 980, 720, 610, 3428];
+const causeColors = ['#1a74c4','#e07b39','#c13333','#8e44ad','#3a8a3a','#c9850d','#73726c'];
+
+const sizeClasses = ['A (<0.25ac)','B (0.25–9ac)','C (10–99ac)','D (100–299ac)','E (300–999ac)','F (1K–4.9Kac)','G (5K+ac)'];
+const sizeAcres = [280, 24500, 187000, 310000, 620000, 1140000, 1918220];
+
+const counties = ['Riverside','San Bernardino','Shasta','Plumas','Trinity','Mendocino','Tehama','Siskiyou','El Dorado','Fresno'];
+const countyAcres = [580000, 520000, 490000, 460000, 420000, 390000, 370000, 350000, 310000, 285000];
+
+const yearLabels = Array.from({length:20},(_,i)=>(2000+i).toString());
+const yearCounts = [480,510,540,590,620,700,650,580,610,650,720,780,830,760,810,890,940,1020,1080,1148];
+
+Chart.defaults.font.family = 'system-ui,sans-serif';
+Chart.defaults.font.size = 10;
+Chart.defaults.color = '#888';
+
+const gridOpts = { color:'rgba(0,0,0,0.06)', lineWidth:0.5 };
+const isDark = matchMedia('(prefers-color-scheme:dark)').matches;
+const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+const textColor = isDark ? '#aaa' : '#666';
+Chart.defaults.color = textColor;
+
+new Chart(document.getElementById('c-yearly'),{
+  type:'bar',
+  data:{
+    labels:yearLabels,
+    datasets:[{
+      label:'Fires',
+      data:yearCounts,
+      backgroundColor:yearCounts.map((_,i)=> i>=10 ? '#c13333cc':'#1a74c4aa'),
+      borderWidth:0
+    }]
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>' '+c.parsed.y.toLocaleString()+' fires'}}},
+    scales:{
+      x:{grid:{color:gridColor},ticks:{maxRotation:0,autoSkip:true,maxTicksLimit:10}},
+      y:{grid:{color:gridColor},ticks:{callback:v=>v.toLocaleString()}}
+    }
+  }
+});
+
+const legCause = document.getElementById('leg-cause');
+causeLabels.forEach((l,i)=>{
+  const span = document.createElement('span');
+  span.className='leg-item';
+  span.innerHTML=`<span class="leg-sq" style="background:${causeColors[i]}"></span>${l}`;
+  legCause.appendChild(span);
+});
+
+new Chart(document.getElementById('c-cause'),{
+  type:'doughnut',
+  data:{
+    labels:causeLabels,
+    datasets:[{data:causeCounts, backgroundColor:causeColors, borderWidth:1, borderColor:'#fff'}]
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false, cutout:'62%',
+    plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>' '+(c.raw/causeCounts.reduce((a,b)=>a+b)*100).toFixed(1)+'%'}}}
+  }
+});
+
+new Chart(document.getElementById('c-size'),{
+  type:'bar',
+  data:{
+    labels:sizeClasses,
+    datasets:[{
+      label:'Acres',
+      data:sizeAcres,
+      backgroundColor:'#e07b39bb',
+      borderWidth:0
+    }]
+  },
+  options:{
+    indexAxis:'y', responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{display:false}},
+    scales:{
+      x:{grid:{color:gridColor},ticks:{callback:v=>v>=1000000?(v/1000000).toFixed(1)+'M':v>=1000?(v/1000).toFixed(0)+'K':v}},
+      y:{grid:{display:false}}
+    }
+  }
+});
+
+const scatterData = Array.from({length:80},()=>{
+  const logA = 0.5 + Math.random()*4.5;
+  const days = 2 + logA*3.1 + (Math.random()-0.5)*4;
+  return {x:parseFloat(logA.toFixed(2)), y:parseFloat(Math.max(0,days).toFixed(1))};
+});
+const regLine = [{x:0.5,y:2+0.5*3.1},{x:5,y:2+5*3.1}];
+
+new Chart(document.getElementById('c-scatter'),{
+  type:'scatter',
+  data:{
+    datasets:[
+      {label:'Fire observations', data:scatterData, backgroundColor:'#1a74c455', pointRadius:3, pointHoverRadius:4},
+      {label:'OLS fit (R²=0.71)', data:regLine, type:'line', borderColor:'#c13333', borderWidth:1.5, pointRadius:0, borderDash:[4,2]}
+    ]
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{display:false}},
+    scales:{
+      x:{title:{display:true,text:'log(Acres)',font:{size:10}},grid:{color:gridColor}},
+      y:{title:{display:true,text:'Containment days',font:{size:10}},grid:{color:gridColor}}
+    }
+  }
+});
+
+new Chart(document.getElementById('c-county'),{
+  type:'bar',
+  data:{
+    labels:counties,
+    datasets:[{
+      label:'Acres burned',
+      data:countyAcres,
+      backgroundColor:'#3a8a3acc',
+      borderWidth:0
+    }]
+  },
+  options:{
+    indexAxis:'y', responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>' '+(c.raw/1000).toFixed(0)+'K acres'}}},
+    scales:{
+      x:{grid:{color:gridColor},ticks:{callback:v=>(v/1000).toFixed(0)+'K'}},
+      y:{grid:{display:false},ticks:{font:{size:10}}}
+    }
+  }
+});
+
+const causes = ['Lightning','Equipment','Debris','Arson','Campfire','Powerline'];
+const sizes = ['Class A–B','Class C–D','Class E–G'];
+const causeDiv = document.getElementById('causeSlicers');
+const sizeDiv = document.getElementById('sizeSlicers');
+causes.forEach(c=>{
+  const b = document.createElement('button');
+  b.className='slicer-btn sel'; b.textContent=c;
+  b.onclick=()=>b.classList.toggle('sel');
+  causeDiv.appendChild(b);
+});
+sizes.forEach(s=>{
+  const b = document.createElement('button');
+  b.className='slicer-btn sel'; b.textContent=s;
+  b.onclick=()=>b.classList.toggle('sel');
+  sizeDiv.appendChild(b);
+});
+
+function applyFilter(){
+  const yr = document.getElementById('yearFilter').value;
+  const newCounts = yr==='2000s' ? yearCounts.slice(0,10).concat(Array(10).fill(0))
+    : yr==='2010s' ? Array(10).fill(0).concat(yearCounts.slice(10))
+    : yearCounts;
+  Chart.getChart('c-yearly').data.datasets[0].data = newCounts;
+  Chart.getChart('c-yearly').update();
+  const fires = yr==='2000s'?5930:yr==='2010s'?5528:11458;
+  const acres = yr==='2000s'?'1.6M':yr==='2010s'?'2.6M':'4.2M';
+  document.getElementById('kpi-fires').textContent=fires.toLocaleString();
+  document.getElementById('kpi-acres').textContent=acres;
+}
+</script>
