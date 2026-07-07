@@ -4,7 +4,7 @@ Predicting significant wildfire occurrence one month in advance using spatio-tem
 
 ---
 
-## 📖 Overview
+## Overview
 
 This project develops a machine learning pipeline to predict the probability of a significant wildfire occurring in a specific geographic region during the following month.
 
